@@ -1,21 +1,17 @@
 name: test
 on:
   push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+    branches: [ main ]
 
 jobs:
-  build:
-
-    runs-on: ubuntu:18.02
-
+  test:
+    runs-on: ubuntu-18.04
     steps:
     - name: create test user
       run: |
         useradd -ms /bin/bash test
         echo \"test ALL=(ALL) NOPASSWD: ALL\" >>/etc/sudoers
         mkdir -m 755 -p /home/test/.ssh && touch /home/test/.ssh/id_rsa.pub
-    - name: test install script
+    - name: test script
       run : |
         su -s /bin/bash -c './install_desktop.sh default' test
