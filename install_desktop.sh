@@ -1,8 +1,4 @@
 #!/bin/bash
-# Installation script for Bleckwen developpers working on Ubuntu
-
-# TODO:
-# Chrome: check 
 
 ostype=$(sed -n 's/^ID=\(.*\)/\1/p' /etc/os-release | sed 's/"//g')
 
