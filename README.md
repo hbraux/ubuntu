@@ -1,7 +1,7 @@
 # Ubuntu Development Environment
 
 
-![Build status](https://github.com/hbraux/ubuntu/workflows/build/badge.svg)
+![Test status](https://github.com/hbraux/ubuntu/workflows/test/badge.svg)
 
 Run the following command to install *features*:
 ```sh
