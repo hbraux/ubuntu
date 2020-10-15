@@ -7,6 +7,7 @@ jobs:
   test:
     runs-on: ubuntu-18.04
     steps:
-    - name: test script
+    - uses: actions/checkout@v2      
+    - name: test install_desktop.sh
       run : |
         ./install_desktop.sh default
