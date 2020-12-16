@@ -143,7 +143,7 @@ cat >/tmp/install_desktop.yml<<'EOF'
 
     - name: install Docker
       apt:
-        name: docker-ce
+        name: [docker-ce, docker-ce-cli]
       become: yes
       tags: [docker,default,all]
 
