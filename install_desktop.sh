@@ -174,7 +174,7 @@ cat >/tmp/install_desktop.yml<<'EOF'
 
     - name: install OpenJDK 8
       apt:
-        name: [openjdk-8-jdk, openjdk-8-source]
+        name: [openjdk-8-jdk, openjdk-8-source, openjdk-8-dbg]
       become: yes
       tags: [jdk,default,all]
 
@@ -198,30 +198,43 @@ cat >/tmp/install_desktop.yml<<'EOF'
       become: yes
       tags: [sbt,never,all]
 
-    - name: add Intellij IDEA repository
-      apt_repository:
-        repo: ppa:mmk2410/intellij-idea
-        update_cache: yes
-      become: yes
-      tags: [intellij,never,all]
-
-    - name: install Intellij IDEA Community to folder /opt
-      apt:
-        name: intellij-idea-community
-      become: yes
-      tags: [intellij,never,all]
-
-    - name: fix permission /opt/intellij-idea-community
+    - name: create directory /opt/jetbrains
       file:
-        path: /opt/intellij-idea-community
+        path: /opt/jetbrains
         owner: "{{ ansible_user_id }}"
       become: yes
       tags: [intellij,never,all]
 
-    - name: create script $HOME/bin/idea
+    - name: find latest Intellij version
+      set_fact:
+        idea_build: IU-211.6085.26
+      tags: [intellij,never,all]
+
+    - name: check if Intellij is already installed
+      stat:
+        path: /opt/jetbrains/idea-{{ idea_build }}
+      register: stat_idea
+      tags: [intellij,never,all]
+
+    - name: download Intellij {{ idea_build }}
+      unarchive:
+        src: https://download.jetbrains.com/idea/idea{{ idea_build }}.tar.gz
+        remote_src: true
+        dest: /opt/jetbrains/
+      when: not stat_idea.stat.exists
+      tags: [intellij,never,all]
+
+    - name: fix permission /opt/jetbrains
+      file:
+        path: /opt/jetbrains
+        owner: "{{ ansible_user_id }}"
+      become: yes
+      tags: [intellij,never,all]
+
+    - name: update script $HOME/bin/idea
       copy:
         content: |
-           /opt/intellij-idea-community/bin/idea.sh >/opt/intellij-idea-community/idea.log 2>&1 &
+           /opt/jetbrains/idea-{{ idea_build }}/bin/idea.sh >/opt/jetbrains/{{ idea_build }}.log 2>&1 &
         dest: "{{ ansible_env.HOME }}/bin/idea"
         owner: "{{ ansible_user_id }}"
         mode: a+rx

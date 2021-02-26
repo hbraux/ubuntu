@@ -15,3 +15,7 @@ Supported features:
 * netdata
 * oracle
 * all
+
+Limitations: 
+* Only tested with Ubuntu 18.04
+
