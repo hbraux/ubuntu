@@ -70,6 +70,7 @@ cat >/tmp/install_desktop.yml<<'EOF'
         oracle_version: 12.2
         oracle_release: 12.2.0.1.0-2
         oracle_db: fides
+        conda_home: "{{ ansible_env.HOME }}/miniconda"
       tags: [always]
 
     - name: allow passwordless sudo for sudo group
@@ -422,6 +423,26 @@ cat >/tmp/install_desktop.yml<<'EOF'
         remote_src: yes
       become: yes
       tags: [terraform,never,all]
+
+    - name: download mini conda
+      get_url:
+        url: https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+        dest: /tmp/miniconda.sh
+      tags: [conda,never,all]
+
+    - name: install mini conda in {{ conda_home }}
+      shell: bash /tmp/miniconda.sh -b -p {{ conda_home }}
+      args:
+        creates: "{{ conda_home }}"
+      tags: [conda,never,all]
+
+    - name: update .bashrc for conda
+      blockinfile:
+        path: "{{ ansible_env.HOME }}/.bashrc"
+        block: |
+          PATH=$PATH:{{ conda_home }}/bin
+          . {{ conda_home }}/etc/profile.d/conda.sh
+      tags: [conda,never,all]
 
     - debug:
         msg: "WARNING: YOU NEED TO REBOOT NOW!"
