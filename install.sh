@@ -101,21 +101,6 @@ cat >/tmp/install_desktop.yml<<'EOF'
       become: yes
       tags: [env,default,all]
 
-    - name: update Inotify Watches Limit
-      copy:
-        content: |
-          fs.inotify.max_user_watches = 524288
-        dest: /etc/sysctl.d/99-inotify.conf
-      register: inotify
-      become: yes
-      tags: [env,default,all]
-
-    - name: refresh system
-      shell: sysctl -p --system
-      become: yes
-      when: inotify.changed
-      tags: [env,default,all]
-
     - name: install git
       apt:
         name: git
@@ -204,6 +189,23 @@ cat >/tmp/install_desktop.yml<<'EOF'
         name: ["x11-apps","libxkbcommon-x11-0","libgbm-dev"]
       become: yes
       tags: [intellij,never,all]
+
+    - name: update Kernel for for intellij
+      copy:
+        content: |
+          fs.inotify.max_user_watches = 524288
+          kernel.perf_event_paranoid = 1
+          kernel.kptr_restrict = 0
+        dest: /etc/sysctl.d/99-inotify.conf
+      register: inotify
+      become: yes
+      tags: [intellij,default,all]
+
+    - name: refresh system
+      shell: sysctl -p --system
+      become: yes
+      when: inotify.changed
+      tags: [intellij,default,all]
 
     - name: create directory /opt/jetbrains
       file:
