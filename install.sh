@@ -1,17 +1,17 @@
 #!/bin/bash
 
 ostype=$(sed -n 's/^ID=\(.*\)/\1/p' /etc/os-release | sed 's/"//g')
+osversion=$(sed -n 's/^VERSION_ID=\(.*\)/\1/p' /etc/os-release | sed 's/"//g')
 
 if [[ $ostype != ubuntu ]]; then
     echo "Error: this script requires Ubuntu"; exit 1
 fi
 
-grep -q 'VERSION_ID="18' /etc/os-release
-if [[ $? -ne 0 ]]; then
+if [[ $osversion != 18.04 && $osversion != 20.04 ]]; then
   if [[ $1 == -i ]]; then
     shift
   else
-    echo "Error: this script has only been verified on Ubuntu 18. Add -i to ignore"; exit 1
+    echo "Error: this script has only been verified on Ubuntu 18.04 and 20.04. Add -i to ignore"; exit 1
   fi
 fi
 
@@ -96,7 +96,7 @@ cat >/tmp/install_desktop.yml<<'EOF'
 
     - name: install misc packages (make,jq,unzip,..)
       apt:
-        name: ["make","jq","postgresql-client","unzip","x11-apps"]
+        name: ["make","jq","postgresql-client","unzip"]
       become: yes
       tags: [env,default,all]
 
@@ -148,7 +148,7 @@ cat >/tmp/install_desktop.yml<<'EOF'
       tags: [docker,default,all]
 
     - name: add user {{ ansible_user_id }} to docker group
-      user:      
+      user:
         name: "{{ ansible_user_id }}"
         groups: docker
         append: yes
@@ -161,9 +161,9 @@ cat >/tmp/install_desktop.yml<<'EOF'
         path: "{{ ansible_env.HOME }}/.bashrc"
         regexp: '.*docker start'
         line: "[[ ! -S /var/run/docker.sock ]] && sudo sysctl -p && sudo service docker start && sudo sed -i -e '$a172.17.0.1 local' /etc/hosts"
-      tags: [docker,default,all]        
+      tags: [docker,default,all]
       when: wsl
-      
+
     - name: install docker-compose 1.25
       get_url:
         url: https://github.com/docker/compose/releases/download/1.25.0/docker-compose-Linux-x86_64
@@ -198,9 +198,16 @@ cat >/tmp/install_desktop.yml<<'EOF'
       become: yes
       tags: [sbt,never,all]
 
+    - name: install 3p for intellij
+      apt:
+        name: ["x11-apps","libxkbcommon-x11-0","libgbm-dev"]
+      become: yes
+      tags: [intellij,never,all]
+
     - name: create directory /opt/jetbrains
       file:
         path: /opt/jetbrains
+        state: directory
         owner: "{{ ansible_user_id }}"
       become: yes
       tags: [intellij,never,all]
@@ -269,7 +276,7 @@ cat >/tmp/install_desktop.yml<<'EOF'
 
     - name: install python3
       apt:
-        name: ["python3","python3-pip"]   
+        name: ["python3","python3-pip"]
       become: yes
       tags: [python3,never,all]
 
@@ -291,22 +298,22 @@ cat >/tmp/install_desktop.yml<<'EOF'
       get_url:
         url: https://raw.githubusercontent.com/netdata/binary-packages/master/netdata-latest.gz.run
         dest: /tmp/netdata-version
-      tags: [netdata,never,all]   
+      tags: [netdata,never,all]
 
-    - name: get netdata version 
+    - name: get netdata version
       shell: cat /tmp/netdata-version
       register: cat_cmd
       changed_when: false
       tags: [netdata,never,all]
 
-    - name: download netdata binary 
+    - name: download netdata binary
       get_url:
         url: https://raw.githubusercontent.com/netdata/binary-packages/master/{{ cat_cmd.stdout }}
         dest: /tmp/netdata.gz.run
         mode: 0755
-      tags: [netdata,never,all] 
+      tags: [netdata,never,all]
 
-    - name: install netdata 
+    - name: install netdata
       shell: /tmp/netdata.gz.run --quiet --accept --noprogress --nox11
       args:
         creates: /opt/netdata
@@ -316,12 +323,12 @@ cat >/tmp/install_desktop.yml<<'EOF'
     - name: check netdata service (port 19999)
       wait_for:
         port: 19999
-      tags: [netdata,never,all]    
+      tags: [netdata,never,all]
 
     - name: install libaio
       apt:
         name: libaio1
-      become: yes        
+      become: yes
       tags: [oracle,never,all]
 
     - name: set oracle packages

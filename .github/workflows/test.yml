@@ -5,9 +5,9 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2      
-    - name: test install_desktop.sh
+    - name: test install.sh
       run : |
-        ./install_desktop.sh default
+        ./install.sh default

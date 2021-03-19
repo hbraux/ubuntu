@@ -5,7 +5,7 @@
 
 Run the following command to install *features*:
 ```sh
-curl -s https://raw.githubusercontent.com/hbraux/ubuntu/main/install_desktop.sh | bash -s FEATURE ...
+curl -s https://raw.githubusercontent.com/hbraux/ubuntu/main/install.sh | bash -s FEATURE ...
 ```
 
 Supported features:
@@ -17,5 +17,5 @@ Supported features:
 * all
 
 Limitations: 
-* Only tested with Ubuntu 18.04
+* Only tested with Ubuntu 18.04 and 
 
