@@ -17,5 +17,5 @@ Supported features:
 * all
 
 Limitations: 
-* Only tested with Ubuntu 18.04 and 
+* Only tested with Ubuntu 18.04 and 20.04
 
