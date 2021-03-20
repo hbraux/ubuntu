@@ -97,15 +97,52 @@ cat >/tmp/install_desktop.yml<<'EOF'
 
     - name: install misc packages (make,jq,unzip,..)
       apt:
-        name: ["make","jq","postgresql-client","unzip"]
+        name: ["make","jq","git","postgresql-client","unzip"]
       become: yes
       tags: [env,default,all]
 
-    - name: install git
-      apt:
-        name: git
+    - name: update vm.max_map_count to 262144 (Elasticsearch)
+      sysctl:
+        name: vm.max_map_count
+        value: "262144"
       become: yes
-      tags: [git,default,all]
+      tags: [env,default,all]
+
+    - name: update fs.aio-max-nr to 1048576 (ScyllaDB)
+      sysctl:
+        name: fs.aio-max-nr
+        value: "1048576"
+      become: yes
+      tags: [env,default,all]
+
+    - name: update perf_event_paranoid to 1
+      sysctl:
+        name: kernel.perf_event_paranoid
+        value: "1"
+      become: yes
+      tags: [env,default,all]
+
+    - name: update kptr_restrict to 0
+      sysctl:
+        name: kernel.kptr_restrict
+        value: "0"
+      become: yes
+      tags: [env,default,all]
+
+    - name: update inotify
+      copy:
+        content: |
+          fs.inotify.max_user_watches = 524288
+        dest: /etc/sysctl.d/99-inotify.conf
+      register: inotify
+      become: yes
+      tags: [env,default,all]
+
+    - name: refresh system
+      shell: sysctl -p --system
+      become: yes
+      when: inotify.changed
+      tags: [env,default,all]
 
     - name: install ntp
       apt:
@@ -146,7 +183,7 @@ cat >/tmp/install_desktop.yml<<'EOF'
       lineinfile:
         path: "{{ ansible_env.HOME }}/.bashrc"
         regexp: '.*docker start'
-        line: "[[ ! -S /var/run/docker.sock ]] && sudo sysctl -p && sudo service docker start && sudo sed -i -e '$a172.17.0.1 local' /etc/hosts"
+        line: "[[ ! -S /var/run/docker.sock ]] && sudo sysctl -p -q && sudo service docker start && sudo sed -i -e '$a172.17.0.1 local' /etc/hosts"
       tags: [docker,default,all]
       when: wsl
 
@@ -189,23 +226,6 @@ cat >/tmp/install_desktop.yml<<'EOF'
         name: ["x11-apps","libxkbcommon-x11-0","libgbm-dev"]
       become: yes
       tags: [intellij,never,all]
-
-    - name: update Kernel for for intellij
-      copy:
-        content: |
-          fs.inotify.max_user_watches = 524288
-          kernel.perf_event_paranoid = 1
-          kernel.kptr_restrict = 0
-        dest: /etc/sysctl.d/99-inotify.conf
-      register: inotify
-      become: yes
-      tags: [intellij,default,all]
-
-    - name: refresh system
-      shell: sysctl -p --system
-      become: yes
-      when: inotify.changed
-      tags: [intellij,default,all]
 
     - name: create directory /opt/jetbrains
       file:
