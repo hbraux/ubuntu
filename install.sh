@@ -71,6 +71,7 @@ cat >/tmp/install_desktop.yml<<'EOF'
         oracle_release: 12.2.0.1.0-2
         oracle_db: fides
         conda_home: "{{ ansible_env.HOME }}/miniconda"
+        idea_build: IU-211.6556.6
       tags: [always]
 
     - name: allow passwordless sudo for sudo group
@@ -233,11 +234,6 @@ cat >/tmp/install_desktop.yml<<'EOF'
         state: directory
         owner: "{{ ansible_user_id }}"
       become: yes
-      tags: [intellij,never,all]
-
-    - name: find latest Intellij version
-      set_fact:
-        idea_build: IU-211.6085.26
       tags: [intellij,never,all]
 
     - name: check if Intellij is already installed
