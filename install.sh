@@ -26,7 +26,7 @@ if [[ $# -eq 0 ]]; then
     fi
     defaults=$(grep "tags: \[.*,default" $0 | sed -e 's/.* \[//g;s/,default.*//g' | uniq | tr '\n' ' ')
     options=$(grep "tags: \[.*,never" $0 | sed -e 's/.* \[/* /g;s/,never.*//g' | uniq)
-    echo "Usage: $0 FEATURE ... 
+    echo "Usage: $0 FEATURE ...
 Supported features:
 * default ($defaults)
 $options
@@ -41,7 +41,7 @@ if [[ $1 == -v ]]; then
 fi
 
 if [[ ! -f $HOME/.ssh/id_rsa.pub ]]; then
-  echo "Error: no SSH keys found. You need to generate them (ssh-keygen) 
+  echo "Error: no SSH keys found. You need to generate them (ssh-keygen)
 and attach the publick key to your https://gitlab.com/ profile.
 Continuing but installation may fail"
 fi
@@ -52,7 +52,7 @@ sudo ls >/dev/null || exit 1
 cd $HOME
 
 which ansible-playbook >/dev/null 2>&1
-if [[ $? -ne 0 ]]; then 
+if [[ $? -ne 0 ]]; then
   echo "Installing Ansible..."
   sudo apt install software-properties-common
   sudo apt-add-repository --yes --update ppa:ansible/ansible
@@ -97,7 +97,7 @@ cat >/tmp/install_desktop.yml<<'EOF'
 
     - name: install misc packages (make,jq,unzip,..)
       apt:
-        name: ["make","jq","git","postgresql-client","unzip"]
+        name: ["make","jq","git","postgresql-client","unzip","libsnappy-dev"]
       become: yes
       tags: [env,default,all]
 
@@ -204,7 +204,7 @@ cat >/tmp/install_desktop.yml<<'EOF'
     - name: install SBT key
       apt_key:
         id: 2EE0EA64E40A89B84B2DF73499E82A75642AC823
-        keyserver: hkp://keyserver.ubuntu.com:80 
+        keyserver: hkp://keyserver.ubuntu.com:80
       become: yes
       tags: [sbt,never,all]
 
@@ -270,7 +270,7 @@ cat >/tmp/install_desktop.yml<<'EOF'
         mode: a+rx
       tags: [intellij,never,all]
 
-    - name: install Maven 
+    - name: install Maven
       apt:
         name: maven
       become: yes
@@ -371,14 +371,14 @@ cat >/tmp/install_desktop.yml<<'EOF'
       with_items: "{{ orapackages }}"
       when: cacheurl != ""
       tags: [oracle,never,all]
-      
+
     - name: install oracle client {{ oracle_version }}
       apt:
         deb: /tmp/{{ item }}
       with_items: "{{ orapackages }}"
-      become: yes        
+      become: yes
       tags: [oracle,never,all]
-      
+
     - name: create oracle client directories
       file:
         path: /usr/lib/oracle/{{ oracle_version }}/client64/{{ item }}
@@ -387,15 +387,15 @@ cat >/tmp/install_desktop.yml<<'EOF'
       with_items:
         - rdbms/public
         - network/admin
-      become: yes        
+      become: yes
       tags: [oracle,never,all]
-      
+
     - name: create tnsnames.ora
       copy:
         content: |
           {{ oracle_db }}=(DESCRIPTION=(ADDRESS_LIST=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521)))(CONNECT_DATA=(SERVICE_NAME={{ oracle_db }})))
         dest: /usr/lib/oracle/{{ oracle_version }}/client64/network/admin/tnsnames.ora
-      become: yes        
+      become: yes
       tags: [oracle,never,all]
 
     - name: create /etc/profile.d/oracle.sh
@@ -408,7 +408,7 @@ cat >/tmp/install_desktop.yml<<'EOF'
           export TZ=Europe/Paris
           export ORA_SDTZ=Europe/Paris
         dest: /etc/profile.d/oracle.sh
-      become: yes        
+      become: yes
       tags: [oracle,never,all]
 
     - name: update .bashrc to load Oracle env
@@ -437,7 +437,7 @@ cat >/tmp/install_desktop.yml<<'EOF'
         name: dbeaver-ce
       become: yes
       tags: [dbeaver,never,all]
-        
+
     - name: install terraform
       unarchive:
         src: https://releases.hashicorp.com/terraform/0.12.23/terraform_0.12.23_linux_amd64.zip
@@ -468,7 +468,7 @@ cat >/tmp/install_desktop.yml<<'EOF'
 
     - debug:
         msg: "WARNING: YOU NEED TO REBOOT NOW!"
-      when: user_chg.changed 
+      when: user_chg.changed
       tags: [default,all]
 EOF
 
