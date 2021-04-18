@@ -71,7 +71,7 @@ cat >/tmp/install_desktop.yml<<'EOF'
         oracle_release: 12.2.0.1.0-2
         oracle_db: fides
         conda_home: "{{ ansible_env.HOME }}/miniconda"
-        idea_build: IU-211.6556.6
+        idea_build: IU-211.6693.111
       tags: [always]
 
     - name: allow passwordless sudo for sudo group
@@ -236,7 +236,23 @@ cat >/tmp/install_desktop.yml<<'EOF'
       become: yes
       tags: [intellij,never,all]
 
-    - name: check if Intellij is already installed
+    - name: download Intellij builds list
+      get_url:
+        url: https://confluence.jetbrains.com/display/IDEADEV/IDEA+2021.1+latest+builds 
+        dest: /tmp/idea_builds
+      tags: [intellij,never,all]
+
+    - name: try to find the latest build
+      shell: sed -nE 's/.*Recent Changes(.{100}).*/\1/p;' /tmp/idea_builds | sed -e 's/.*IDEA //;s/<.*//'
+      register: grepbuilds
+      tags: [intellij,never,all]
+
+    - name: set variable idea_build
+      set_fact:
+        idea_build: "IU-{{ grepbuilds.stdout }}"
+      tags: [intellij,never,all]
+
+    - name: check if Intellij build {{ idea_build }} is already installed
       stat:
         path: /opt/jetbrains/idea-{{ idea_build }}
       register: stat_idea
