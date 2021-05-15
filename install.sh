@@ -188,9 +188,9 @@ cat >/tmp/install_desktop.yml<<'EOF'
       tags: [docker,default,all]
       when: wsl
 
-    - name: install docker-compose 1.25
+    - name: install docker-compose 1.29.1
       get_url:
-        url: https://github.com/docker/compose/releases/download/1.25.0/docker-compose-Linux-x86_64
+        url: https://github.com/docker/compose/releases/download/1.29.1/docker-compose-Linux-x86_64
         dest: /usr/bin/docker-compose
         mode: 0755
       become: yes
