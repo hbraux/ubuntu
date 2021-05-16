@@ -1,5 +1,6 @@
 #!/bin/bash
 # Secure and setup a Cloud VM on Ubuntu
+# https://www.tecmint.com/install-wordpress-with-nginx-in-ubuntu-20-04/
 
 PORT=2222
 PBOOK="/tmp/playbook$$.yml"
@@ -125,19 +126,19 @@ cat > $PBOOK <<EOF
   - name: install nginx and letsencrypt
     apt:
       name: ["nginx","letsencrypt"]
-    tags: [web]
+    tags: [http]
 
   - name: remove default nginx site
     file:
       name: /etc/nginx/sites-enabled/default
       state: absent
-    tags: [web]
+    tags: [http]
 
   - name: create letsencrypt directory
     file:
       name: "{{ letsencryptdir }}"
       state: directory
-    tags: [web]
+    tags: [http]
 
   - name: install nginx site for letsencrypt
     copy:
@@ -156,26 +157,26 @@ cat > $PBOOK <<EOF
           }
         }
     register: nginx_updated
-    tags: [web]
+    tags: [http]
 
   - name: reload nginx
     service:
       name: nginx
       state: restarted
     when: nginx_updated.changed
-    tags: [web]
+    tags: [http]
 
   - name: Create letsencrypt certificate
     shell: letsencrypt certonly -n --webroot --webroot-path {{ letsencryptdir }} --config-dir {{ letsencryptdir }} --work-dir {{ letsencryptdir }} --logs-dir {{ letsencryptdir }}  -m contact@{{ domain }} --agree-tos -d {{ domain }}
     args:
       creates: "{{ letsencryptdir }}/live/{{ domain }}"
-    tags: [web]
+    tags: [http]
 
   - name: Generate dhparams
     shell: openssl dhparam -out /etc/nginx/dhparams.pem 2048
     args:
       creates: /etc/nginx/dhparams.pem
-    tags: [web]
+    tags: [http]
 
   - name: Install nginx secured site
     copy:
@@ -197,13 +198,18 @@ cat > $PBOOK <<EOF
           ssl_dhparam /etc/nginx/dhparams.pem;
           ssl_prefer_server_ciphers on;
           root /var/www/html;
-          index index.html index.htm;
+          index index.php index.html index.htm;
           location / {
             try_files \$uri \$uri/ =404;
           }
+          location ~ \.php\$ {
+            include snippets/fastcgi-php.conf;
+            fastcgi_pass unix:/run/php/php7.4-fpm.sock;
+            fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+          }
         }
     register: nginx_updated
-    tags: [web]
+    tags: [http]
 
   - name: create simple page
     copy:
@@ -212,22 +218,87 @@ cat > $PBOOK <<EOF
         <html>
         <body><h1>Under construction..</h1></body>
         </html>
-    tags: [web]
+    tags: [http]
 
   - name: reload nginx
     service:
       name: nginx
       state: restarted
     when: nginx_updated.changed
-    tags: [web]
+    tags: [http]
 
   - name: Add letsencrypt cronjob for cert renewal
     cron:
       name: letsencrypt_renewal
       special_time: monthly
       job: "/usr/bin/letsencrypt --renew certonly -n --webroot -w {{ letsencryptdir }} -m contact@{{ domain }} --agree-tos -d {{ domain }}"
-    tags: [web]
+    tags: [http]
 
+  - name: install mysql
+    apt:
+      name: ["mysql-server","python3-mysqldb"]
+    tags: [wordpress]
+
+  - name: enable mysql service
+    service:
+      name: mysql
+      state: started
+      enabled: yes
+    tags: [wordpress]
+
+  - name: create mysql database wordpress
+    mysql_db:
+      name: wordpress
+    tags: [wordpress]
+
+  - name: create mysql user wp
+    no_log: true
+    mysql_user:
+      name: wp
+      password: wp123
+      priv: '*.*:ALL'
+    tags: [wordpress]
+
+  - name: install wordpress
+    apt:
+      name: ["wordpress","php-mysql","php-cli","php-curl","php-gd","php-intl","php-fpm"]
+    tags: [wordpress]
+
+  - name: set permissions on /usr/share/wordpress
+    file:
+      path: /usr/share/wordpress
+      owner: www-data
+      group: www-data
+    tags: [wordpress]
+
+  - name: configure wordpress
+    copy:
+      dest: /etc/wordpress/config-{{ domain }}.php
+      content: |
+        <?php
+        define('DB_NAME', 'wordpress');
+        define('DB_USER', 'wp');
+        define('DB_PASSWORD', 'wp123');
+        define('DB_HOST', 'localhost');
+        define('DB_COLLATE', 'utf8_general_ci');
+        define('WP_CONTENT_DIR', '/usr/share/wordpress/wp-content');
+        ?>
+    tags: [wordpress]
+
+  - name: update ngninx config
+    lineinfile:
+      path: /etc/nginx/sites-enabled/https
+      regexp: '^  root .*'
+      line: '  root /usr/share/wordpress;'
+    register: nginx_updated
+    tags: [wordpress]
+
+  - name: reload nginx
+    service:
+      name: nginx
+      state: restarted
+    when: nginx_updated.changed
+    tags: [wordpress]
 EOF
 ansible-playbook $PBOOK -i $VM, -b -e domain=${VM#*.} $args
 rm -f $PBOOK
