@@ -1,5 +1,5 @@
 #!/bin/bash
-# Install a Cloud VM
+# Secure and setup a Cloud VM on Ubuntu
 
 PORT=2222
 PBOOK="/tmp/playbook$$.yml"
@@ -21,23 +21,31 @@ function info {
 
 # Command line
 if [[ $# -eq 0 ]]; then
-  echo "Usage: $0 SERVER"; exit
+  echo "Usage: $0 FQDN [FEATURE]"; exit
 fi
-vm=$1
+VM=$1
+args=""
+shift
+if [[ $# -ne 0 ]]; then
+  args="$*"
+  args="--tags ${args// /,}"
+else
+  args="--tags default"
+fi
 
 # first check if the box is reachable
-ping -c1 $vm >/dev/null || die "Cannot reach $vm"
+ping -c1 $VM >/dev/null || die "Cannot reach $VM"
 
 
 # check if we can reach with SSH
-ssh -p $PORT -o StrictHostKeyChecking=no $vm echo
+ssh -p $PORT -o StrictHostKeyChecking=no $VM echo
 if [[ $? -ne 0 ]]; then
-  ssh-keygen -f $HOME/.ssh/known_hosts -R $vm
-  info "Securing $vm"
+  ssh-keygen -f $HOME/.ssh/known_hosts -R $VM
+  info "Securing $VM"
   echo -e "Cloud admin ($ADMIN) password: \c"
   read pass
   cat >$PBOOK <<EOF
-- hosts: $vm
+- hosts: $VM
   vars:
     ansible_user: $ADMIN
     ansible_password: $pass
@@ -83,29 +91,144 @@ if [[ $? -ne 0 ]]; then
       command: shutdown -r 1
       
 EOF
-  ansible-playbook -i $vm, -b -e username=$USER --ssh-extra-args="-o PubkeyAuthentication=no -o StrictHostKeyChecking=no" $PBOOK || die
+  ansible-playbook -i $VM, -b -e username=$USER --ssh-extra-args="-o PubkeyAuthentication=no -o StrictHostKeyChecking=no" $PBOOK || die
   info "Secured completed. Re-run the script in a few seconds"
   exit
 fi
 
-info "Setting up $vm"
+info "Setting up $VM"
 cat > $PBOOK <<EOF
-- hosts: $vm
+- hosts: $VM
   vars:
     ansible_port: $PORT
+    letsencryptdir: "/var/www/letsencrypt"
   tasks:
   - name: remove Cloud admin user $ADMIN
     user:
       name: $ADMIN
       remove: yes
-    become: yes
+    tags: [default]
+
   - name: run apt update and upgrade
     apt:
       upgrade: safe
       update_cache: yes
-      cache_valid_time: 86400
-    become: yes
+      cache_valid_time: 864000
+    register: apt_upgraded
+    tags: [default]
+
+  - name: reboot
+    reboot:
+    when: apt_upgraded.changed
+    tags: [default]
+
+  - name: install nginx and letsencrypt
+    apt:
+      name: ["nginx","letsencrypt"]
+    tags: [web]
+
+  - name: remove default nginx site
+    file:
+      name: /etc/nginx/sites-enabled/default
+      state: absent
+    tags: [web]
+
+  - name: create letsencrypt directory
+    file:
+      name: "{{ letsencryptdir }}"
+      state: directory
+    tags: [web]
+
+  - name: install nginx site for letsencrypt
+    copy:
+      dest: /etc/nginx/sites-enabled/http
+      content: |
+        server_tokens off;
+        server {
+          listen 80 default_server;
+          server_name {{ domain }};
+          location /.well-known/acme-challenge {
+            root {{ letsencryptdir }};
+            try_files \$uri \$uri/ =404;
+          }
+          location / {
+            rewrite ^ https://{{ domain }}\$request_uri? permanent;
+          }
+        }
+    register: nginx_updated
+    tags: [web]
+
+  - name: reload nginx
+    service:
+      name: nginx
+      state: restarted
+    when: nginx_updated.changed
+    tags: [web]
+
+  - name: Create letsencrypt certificate
+    shell: letsencrypt certonly -n --webroot --webroot-path {{ letsencryptdir }} --config-dir {{ letsencryptdir }} --work-dir {{ letsencryptdir }} --logs-dir {{ letsencryptdir }}  -m contact@{{ domain }} --agree-tos -d {{ domain }}
+    args:
+      creates: "{{ letsencryptdir }}/live/{{ domain }}"
+    tags: [web]
+
+  - name: Generate dhparams
+    shell: openssl dhparam -out /etc/nginx/dhparams.pem 2048
+    args:
+      creates: /etc/nginx/dhparams.pem
+    tags: [web]
+
+  - name: Install nginx secured site
+    copy:
+      dest: /etc/nginx/sites-enabled/https
+      content: |
+        server {
+          listen 443 ssl default deferred;
+          server_name {{ domain }};
+          ssl on;
+          ssl_certificate         {{ letsencryptdir }}/live/{{ domain }}/fullchain.pem;
+          ssl_certificate_key     {{ letsencryptdir }}/live/{{ domain }}/privkey.pem;
+          ssl_trusted_certificate {{ letsencryptdir }}/live/{{ domain }}/fullchain.pem;
+          ssl_session_cache shared:SSL:50m;
+          ssl_session_timeout 5m;
+          ssl_stapling on;
+          ssl_stapling_verify on;
+          ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+          ssl_ciphers "ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA:ECDHE-RSA-AES128-SHA:DHE-RSA-AES256-SHA256:DHE-RSA-AES128-SHA256:DHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA:ECDHE-RSA-DES-CBC3-SHA:EDH-RSA-DES-CBC3-SHA:AES256-GCM-SHA384:AES128-GCM-SHA256:AES256-SHA256:AES128-SHA256:AES256-SHA:AES128-SHA:DES-CBC3-SHA:HIGH:!aNULL:!eNULL:!EXPORT:!DES:!MD5:!PSK:!RC4";
+          ssl_dhparam /etc/nginx/dhparams.pem;
+          ssl_prefer_server_ciphers on;
+          root /var/www/html;
+          index index.html index.htm;
+          location / {
+            try_files \$uri \$uri/ =404;
+          }
+        }
+    register: nginx_updated
+    tags: [web]
+
+  - name: create simple page
+    copy:
+      dest: /var/www/html/index.html
+      content: |
+        <html>
+        <body><h1>Under construction..</h1></body>
+        </html>
+    tags: [web]
+
+  - name: reload nginx
+    service:
+      name: nginx
+      state: restarted
+    when: nginx_updated.changed
+    tags: [web]
+
+  - name: Add letsencrypt cronjob for cert renewal
+    cron:
+      name: letsencrypt_renewal
+      special_time: monthly
+      job: "/usr/bin/letsencrypt --renew certonly -n --webroot -w {{ letsencryptdir }} -m contact@{{ domain }} --agree-tos -d {{ domain }}"
+    tags: [web]
+
 EOF
-ansible-playbook $PBOOK -i $vm,
+ansible-playbook $PBOOK -i $VM, -b -e domain=${VM#*.} $args
 rm -f $PBOOK
 
