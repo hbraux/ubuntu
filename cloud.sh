@@ -21,18 +21,13 @@ function info {
 [[ -x /usr/bin/sshpass ]] || die "sshpass is not installed. Run: sudo apt install sshpass"
 
 # Command line
-if [[ $# -eq 0 ]]; then
-  echo "Usage: $0 FQDN [FEATURE]"; exit
+if [[ $# -lt 2 ]]; then
+  echo "Usage: $0 FQDN TAG.."; exit
 fi
 VM=$1
-args=""
 shift
-if [[ $# -ne 0 ]]; then
-  args="$*"
-  args="--tags ${args// /,}"
-else
-  args="--tags default"
-fi
+tags="$*"
+
 
 # first check if the box is reachable
 ping -c1 $VM >/dev/null || die "Cannot reach $VM"
@@ -118,6 +113,11 @@ cat > $PBOOK <<EOF
     register: apt_upgraded
     tags: [default]
 
+  - name: install ntp
+    apt:
+      name: ntp
+    tags: [default]
+
   - name: reboot
     reboot:
     when: apt_upgraded.changed
@@ -125,7 +125,7 @@ cat > $PBOOK <<EOF
 
   - name: install nginx and letsencrypt
     apt:
-      name: ["nginx","letsencrypt"]
+      name: [nginx, letsencrypt]
     tags: [http]
 
   - name: remove default nginx site
@@ -236,7 +236,7 @@ cat > $PBOOK <<EOF
 
   - name: install mysql
     apt:
-      name: ["mysql-server","python3-mysqldb"]
+      name: [mysql-server, python3-mysqldb]
     tags: [wordpress]
 
   - name: enable mysql service
@@ -261,7 +261,7 @@ cat > $PBOOK <<EOF
 
   - name: install wordpress
     apt:
-      name: ["wordpress","php-mysql","php-cli","php-curl","php-gd","php-intl","php-fpm"]
+      name: [wordpress, php-mysql, php-cli, php-curl, php-gd, php-intl, php-fpm]
     tags: [wordpress]
 
   - name: set permissions on /usr/share/wordpress
@@ -299,7 +299,71 @@ cat > $PBOOK <<EOF
       state: restarted
     when: nginx_updated.changed
     tags: [wordpress]
+
+  - name: install JDK
+    apt:
+      name: [openjdk-8-jdk]
+    tags: [minecraft]
+
+  - name: create user minecraft
+    user:
+      name: minecraft
+      shell: /bin/bash
+      group: users
+    tags: [minecraft]
+
+  - name: download minecraft 1.16
+    get_url:
+      url: https://launcher.mojang.com/v1/objects/1b557e7b033b583cd9f66746b7a9ab1ec1673ced/server.jar
+      dest: /home/minecraft/server.jar
+      owner: minecraft
+    tags: [minecraft]
+
+  - name: create EULA file
+    copy:
+      dest: /home/minecraft/eula.txt
+      content: |
+        eula=true
+    tags: [minecraft]
+
+  - name: create minecraft service
+    copy:
+      dest: /etc/systemd/system/minecraft.service 
+      content: |
+        [Unit]
+        Description=Minecraft Server
+        After=network.target
+        [Service]
+        WorkingDirectory=/home/minecraft
+        User=minecraft
+        Restart=always
+        ExecStart=/usr/bin/java -Xmx1024M -Xms1024M -jar server.jar nogui
+        [Install]
+        WantedBy=multi-user.target    
+    tags: [minecraft]
+
+  - name: START minecraft
+    service:
+      name: minecraft
+      state: started
+      enabled: yes
+    tags: [minecraft]
+
+  - name: enable white-list
+    lineinfile:
+      dest: /home/minecraft/server.properties
+      regexp: '^white-list.*'
+      line: 'white-list=true'
+    tags: [minecraft]
+
+  - name: enable white-list
+    lineinfile:
+      dest: /home/minecraft/server.properties
+      regexp: '^white-list.*'
+      line: 'white-list=true'
+    tags: [minecraft]
+
 EOF
-ansible-playbook $PBOOK -i $VM, -b -e domain=${VM#*.} $args
+ansible-playbook $PBOOK -i $VM, -b -e domain=${VM#*.} --tags ${tags// /,}
 rm -f $PBOOK
 
