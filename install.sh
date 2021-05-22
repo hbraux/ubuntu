@@ -59,7 +59,7 @@ if [[ $? -ne 0 ]]; then
   sudo apt-get install --yes --quiet ansible
 fi
 
-cat >/tmp/install_desktop.yml<<'EOF'
+cat >/tmp/install_desktop.yml<<EOF
 - hosts: 127.0.0.1
   connection: local
   tasks:

@@ -28,13 +28,11 @@ VM=$1
 shift
 features="$*"
 
-
 # first check if the box is reachable
 ping -c1 $VM >/dev/null || die "Cannot reach $VM"
 
-
 # check if we can reach with SSH
-ssh -p $PORT -o StrictHostKeyChecking=no $VM echo
+ssh -n -p $PORT -o StrictHostKeyChecking=no $VM echo
 if [[ $? -ne 0 ]]; then
   ssh-keygen -f $HOME/.ssh/known_hosts -R $VM
   info "Securing $VM"
