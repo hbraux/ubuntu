@@ -22,11 +22,11 @@ function info {
 
 # Command line
 if [[ $# -lt 2 ]]; then
-  echo "Usage: $0 FQDN TAG.."; exit
+  echo "Usage: cloud.sh FQDN FEATURE .."; exit
 fi
 VM=$1
 shift
-tags="$*"
+features="$*"
 
 
 # first check if the box is reachable
@@ -364,6 +364,6 @@ cat > $PBOOK <<EOF
     tags: [minecraft]
 
 EOF
-ansible-playbook $PBOOK -i $VM, -b -e domain=${VM#*.} --tags ${tags// /,}
+ansible-playbook $PBOOK -i $VM, -b -e domain=${VM#*.} --tags ${features// /,}
 rm -f $PBOOK
 

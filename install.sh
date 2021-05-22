@@ -145,12 +145,6 @@ cat >/tmp/install_desktop.yml<<'EOF'
       when: inotify.changed
       tags: [env,default,all]
 
-    - name: install ntp
-      apt:
-        name: ntp
-      become: yes
-      tags: [ntp,all]
-
     - name: install Docker key
       apt_key:
         key: docker
