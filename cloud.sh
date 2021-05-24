@@ -111,9 +111,25 @@ cat > $PBOOK <<EOF
     register: apt_upgraded
     tags: [default]
 
+  - name: update timezone
+    timezone:
+      name: "{{ timezone }}"
+    tags: [default]
+
   - name: install ntp
     apt:
       name: ntp
+    tags: [default]
+
+  - name: open port 2222
+    ufw:
+      rule: allow
+      port: '2222'
+    tags: [default]
+
+  - name: enable firewall
+    ufw:
+      state: enabled
     tags: [default]
 
   - name: reboot
@@ -223,6 +239,18 @@ cat > $PBOOK <<EOF
       name: nginx
       state: restarted
     when: nginx_updated.changed
+    tags: [http]
+
+  - name: open port 80
+    ufw:
+      rule: allow
+      port: '80'
+    tags: [http]
+
+  - name: open port 443
+    ufw:
+      rule: allow
+      port: '443'
     tags: [http]
 
   - name: Add letsencrypt cronjob for cert renewal
@@ -351,17 +379,16 @@ cat > $PBOOK <<EOF
     lineinfile:
       dest: /home/minecraft/server.properties
       regexp: '^white-list.*'
-      line: 'white-list=true'
+      line: 'white-list=false'
     tags: [minecraft]
 
-  - name: enable white-list
-    lineinfile:
-      dest: /home/minecraft/server.properties
-      regexp: '^white-list.*'
-      line: 'white-list=true'
+  - name: open port 25565
+    ufw:
+      rule: allow
+      port: '25565'
     tags: [minecraft]
 
 EOF
-ansible-playbook $PBOOK -i $VM, -b -e domain=${VM#*.} --tags ${features// /,}
+ansible-playbook $PBOOK -i $VM, -b -e domain=${VM#*.} -e timezone=${TZ:-UTC} --tags ${features// /,}
 rm -f $PBOOK
 
