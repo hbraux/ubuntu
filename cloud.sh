@@ -368,13 +368,6 @@ cat > $PBOOK <<EOF
         WantedBy=multi-user.target    
     tags: [minecraft]
 
-  - name: START minecraft
-    service:
-      name: minecraft
-      state: started
-      enabled: yes
-    tags: [minecraft]
-
   - name: enable white-list
     lineinfile:
       dest: /home/minecraft/server.properties
@@ -382,10 +375,47 @@ cat > $PBOOK <<EOF
       line: 'white-list=false'
     tags: [minecraft]
 
+  - name: enable rcon
+    lineinfile:
+      dest: /home/minecraft/server.properties
+      regexp: '^enable-rcon=.*'
+      line: 'enable-rcon=true'
+    tags: [minecraft]
+
+  - name: set rcon pasword
+    lineinfile:
+      dest: /home/minecraft/server.properties
+      regexp: '^rcon.password=.*'
+      line: 'rcon.password=airc0n'
+    tags: [minecraft]
+
+  - name: START minecraft
+    service:
+      name: minecraft
+      state: started
+      enabled: yes
+    tags: [minecraft]
+
   - name: open port 25565
     ufw:
       rule: allow
       port: '25565'
+    tags: [minecraft]
+
+  - name: download backup.sh
+    get_url:
+      url: https://raw.githubusercontent.com/nicolaschan/minecraft-backup/master/backup.sh
+      dest: /home/minecraft/backup.sh
+      owner: minecraft
+      mode: a+rx
+    tags: [minecraft]
+
+  - name: cron backups
+    cron:
+      name: save minecraft
+      special_time: daily
+      user: minecraft
+      job: "/home/minecraft/backup.sh -v -c -i /home/minecraft/world -o /opt/backups /home/minecraft/backup.sh -s localhost:25575:airc0n -w rcon -d sequential -m 5"
     tags: [minecraft]
 
 EOF
