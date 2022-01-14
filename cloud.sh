@@ -3,7 +3,7 @@
 # https://www.tecmint.com/install-wordpress-with-nginx-in-ubuntu-20-04/
 
 PORT=2222
-PBOOK="/tmp/playbook$$.yml"
+PBOOK="tmp_playbook$$.yml"
 ADMIN=ubuntu
 
 function die {
@@ -22,7 +22,7 @@ function info {
 
 # Command line
 if [[ $# -lt 2 ]]; then
-  echo "Usage: cloud.sh FQDN FEATURE .."; exit
+  echo "Usage: cloud.sh SERVER_FQDN FEATURE .."; exit
 fi
 VM=$1
 shift
@@ -136,6 +136,43 @@ cat > $PBOOK <<EOF
     reboot:
     when: apt_upgraded.changed
     tags: [default]
+
+  - name: install endlessh
+    copy:
+      src: endlessh
+      dest: /usr/local/sbin/endlessh
+      mode: 0700
+    tags: [endlessh]
+
+  - name: create endlessh service
+    copy:
+      dest: /etc/systemd/system/endlessh.service
+      content: |
+        [Unit]
+        Description=EndleSSH
+        After=network.target network-online.target sshd.service
+        [Service]
+        User=root
+        Group=root
+        Type=simple
+        ExecStart=/usr/local/sbin/endlessh -4 -p 22 -v
+        [Install]
+        WantedBy=multi-user.target
+    tags: [endlessh]
+
+  - name: Start and enable endlessh
+    systemd:
+      name: endlessh
+      enabled: true
+      state: started
+      daemon_reload: true
+    tags: [endlessh]
+
+  - name: open port 22
+    ufw:
+      rule: allow
+      port: '22'
+    tags: [endlessh]
 
   - name: install nginx and letsencrypt
     apt:
@@ -363,7 +400,7 @@ cat > $PBOOK <<EOF
         WorkingDirectory=/home/minecraft
         User=minecraft
         Restart=always
-        ExecStart=/usr/bin/java -Xmx1024M -Xms1024M -jar server.jar nogui
+        ExecStart=/usr/bin/java -Xmx1024M -Xms1024M -Dlog4j2.formatMsgNoLookups=true -jar server.jar nogui
         [Install]
         WantedBy=multi-user.target    
     tags: [minecraft]
