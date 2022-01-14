@@ -139,7 +139,7 @@ cat > $PBOOK <<EOF
 
   - name: install nginx and letsencrypt
     apt:
-      name: [nginx, letsencrypt]
+      name: [nginx, letsencrypt, unzip]
     tags: [http]
 
   - name: remove default nginx site
@@ -402,10 +402,47 @@ cat > $PBOOK <<EOF
       port: '25565'
     tags: [minecraft]
 
-  - name: download backup.sh
-    get_url:
-      url: https://raw.githubusercontent.com/nicolaschan/minecraft-backup/master/backup.sh
-      dest: /home/minecraft/backup.sh
+  - name: download rclone
+    unarchive:
+      src: https://downloads.rclone.org/rclone-current-linux-amd64.zip
+      dest: /opt
+      remote_src: yes
+    tags: [minecraft]
+
+  - name: install rclone
+    copy:
+      src: /opt/rclone-v1.55.1-linux-amd64/rclone
+      dest: /usr/local/bin/rclone
+      remote_src: yes
+      mode: a+rx
+    tags: [minecraft]
+
+  - name: create rclone config dir
+    file:
+      name: "{{ item }}"
+      state: directory
+      owner: minecraft
+    loop:
+      - /home/minecraft/.config
+      - /home/minecraft/.config/rclone
+    tags: [minecraft]
+
+  - name: create rclone config file for gdrive
+    copy:
+      dest: /home/minecraft/.config/rclone/rclone.conf
+      owner: minecraft
+      content: |
+        [remote]
+        type = drive
+        scope = drive.file
+        token = "{{ gtoken }}"
+        eula=true
+    tags: [minecraft]
+
+  - name: copy minecraft.sh
+    copy:
+      src: minecraft.sh
+      dest: /home/minecraft/
       owner: minecraft
       mode: a+rx
     tags: [minecraft]
@@ -415,10 +452,10 @@ cat > $PBOOK <<EOF
       name: save minecraft
       special_time: daily
       user: minecraft
-      job: "/home/minecraft/backup.sh -v -c -i /home/minecraft/world -o /opt/backups /home/minecraft/backup.sh -s localhost:25575:airc0n -w rcon -d sequential -m 5"
+      job: "/home/minecraft/backup.sh -v -c -i /home/minecraft/world -o /opt/backups /home/minecraft/backup.sh -s localhost:25575:airc0n -w rcon -d sequential -m 1"
     tags: [minecraft]
 
 EOF
-ansible-playbook $PBOOK -i $VM, -b -e domain=${VM#*.} -e timezone=${TZ:-UTC} --tags ${features// /,}
+ansible-playbook $PBOOK -i $VM, -b -e domain=${VM#*.} -e timezone=${TZ:-UTC} -e gtoken=${GTOKEN:-} --tags ${features// /,}
 rm -f $PBOOK
 

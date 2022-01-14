@@ -446,7 +446,7 @@ cat >/tmp/install_desktop.yml<<EOF
 
     - name: install terraform
       unarchive:
-        src: https://releases.hashicorp.com/terraform/0.12.23/terraform_0.12.23_linux_amd64.zip
+        src: https://releases.hashicorp.com/terraform/1.0.3/terraform_1.0.3_linux_amd64.zip
         dest: /usr/bin/
         remote_src: yes
       become: yes
