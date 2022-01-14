@@ -138,10 +138,8 @@ cat > $PBOOK <<EOF
     tags: [default]
 
   - name: install endlessh
-    copy:
-      src: endlessh
-      dest: /usr/local/sbin/endlessh
-      mode: 0700
+    apt:
+      name: endlessh
     tags: [endlessh]
 
   - name: create endlessh service
@@ -155,12 +153,12 @@ cat > $PBOOK <<EOF
         User=root
         Group=root
         Type=simple
-        ExecStart=/usr/local/sbin/endlessh -4 -p 22 -v
+        ExecStart=/usr/bin/endlessh -4 -p 22 -v
         [Install]
         WantedBy=multi-user.target
     tags: [endlessh]
 
-  - name: Start and enable endlessh
+  - name: enable endlessh
     systemd:
       name: endlessh
       enabled: true
@@ -168,7 +166,7 @@ cat > $PBOOK <<EOF
       daemon_reload: true
     tags: [endlessh]
 
-  - name: open port 22
+  - name: open port 22 for endlessh
     ufw:
       rule: allow
       port: '22'
