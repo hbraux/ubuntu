@@ -111,14 +111,16 @@ cat > $PBOOK <<EOF
     register: apt_upgraded
     tags: [default]
 
+  - name: remove useless services
+    apt:
+      name: snapd,policykit-1,qemu-guest-agent,ntp
+      state: absent
+      purge: yes
+    tags: [default]
+
   - name: update timezone
     timezone:
       name: "{{ timezone }}"
-    tags: [default]
-
-  - name: install ntp
-    apt:
-      name: ntp
     tags: [default]
 
   - name: open port 2222
