@@ -247,7 +247,6 @@ cat > $PBOOK <<EOF
         server {
           listen 443 ssl default deferred;
           server_name {{ domain }};
-          ssl on;
           ssl_certificate         {{ letsencryptdir }}/live/{{ domain }}/fullchain.pem;
           ssl_certificate_key     {{ letsencryptdir }}/live/{{ domain }}/privkey.pem;
           ssl_trusted_certificate {{ letsencryptdir }}/live/{{ domain }}/fullchain.pem;
@@ -264,10 +263,23 @@ cat > $PBOOK <<EOF
           location / {
             try_files \$uri \$uri/ =404;
           }
-          location ~ \.php\$ {
-            include snippets/fastcgi-php.conf;
-            fastcgi_pass unix:/run/php/php7.4-fpm.sock;
+          location ~ \.php$ {
+            fastcgi_pass unix:/run/php/php8.1-fpm.sock;
             fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+            include fastcgi_params;
+            include snippets/fastcgi-php.conf;
+          }
+          # A long browser cache lifetime can speed up repeat visits to your page
+          location ~* \.(jpg|jpeg|gif|png|webp|svg|woff|woff2|ttf|css|js|ico|xml)\$ {
+             access_log        off;
+             log_not_found     off;
+              expires           360d;
+          }
+          # disable access to hidden files
+          location ~ /\.ht {
+              access_log off;
+              log_not_found off;
+              deny all;
           }
         }
     register: nginx_updated
@@ -323,7 +335,14 @@ cat > $PBOOK <<EOF
 
   - name: install wordpress dependencies
     apt:
-      name: [php-mysql, php-cli, php-curl, php-gd, php-intl, php-fpm]
+      name: [php8.1,php8.1-fpm,php8.1-mysql,php-common,php8.1-cli,php8.1-common,php8.1-opcache,php8.1-readline,php8.1-mbstring,php8.1-xml,php8.1-gd,php8.1-curl]
+    tags: [wordpress]
+
+  - name: enable php8.1-fpm service
+    service:
+      name: php8.1-fpm
+      state: started
+      enabled: yes
     tags: [wordpress]
 
   - name: unpackage
@@ -342,9 +361,27 @@ cat > $PBOOK <<EOF
       recurse: yes
     tags: [wordpress]
 
+  - name: check salts
+    stat:
+      path: /etc/.salts
+    register: stat_salts
+    tags: [wordpress]
+
+  - name: create salts
+    uri:
+      url: https://api.wordpress.org/secret-key/1.1/salt
+      dest: /etc/.salts
+    when: not stat_salts.stat.exists
+    tags: [wordpress]
+
+  - name: get contents of file
+    command: cat /etc/.salts
+    register: salts
+    tags: [wordpress]
+
   - name: configure wordpress
     copy:
-      dest: /etc/wordpress/config-{{ domain }}.php
+      dest: /usr/share/wordpress/wp-config.php
       content: |
         <?php
         define('DB_NAME', 'wordpress');
@@ -353,7 +390,12 @@ cat > $PBOOK <<EOF
         define('DB_HOST', 'localhost');
         define('DB_COLLATE', 'utf8_general_ci');
         define('WP_CONTENT_DIR', '/usr/share/wordpress/wp-content');
-        ?>
+        {{ salts.stdout }}
+        $table_prefix = 'brk_';
+        if ( ! defined( 'ABSPATH' ) ) {
+        	define( 'ABSPATH', __DIR__ . '/' );
+        }
+        require_once ABSPATH . 'wp-settings.php';
     tags: [wordpress]
 
   - name: update ngninx config
