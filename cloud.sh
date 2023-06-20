@@ -391,7 +391,7 @@ cat > $PBOOK <<EOF
         define('DB_COLLATE', 'utf8_general_ci');
         define('WP_CONTENT_DIR', '/usr/share/wordpress/wp-content');
         {{ salts.stdout }}
-        $table_prefix = 'brk_';
+        \$table_prefix = 'brk_';
         if ( ! defined( 'ABSPATH' ) ) {
         	define( 'ABSPATH', __DIR__ . '/' );
         }
