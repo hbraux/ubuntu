@@ -16,9 +16,8 @@ function info {
 }
 
 # Prerequisites
-[[ -f $HOME/.ssh/id_rsa.pub ]] || die "No SSH keys found. Run: ssh-keygen -t rsa -b 4096 -C your_email@example.com"
-[[ -x /usr/bin/ansible-playbook ]] || die "ansible is not installed. Run: sudo apt install ansible"
-[[ -x /usr/bin/sshpass ]] || die "sshpass is not installed. Run: sudo apt install sshpass"
+[[ -f $HOME/.ssh/id_ed25519.pub ]] || die "No SSH keys found. Run: ssh-keygen -t ed25519 -C your_email@example.com"
+ansible-playbook --version >/dev/null || die "ansible is not installed. Run: sudo apt install ansible"
 
 # Command line
 if [[ $# -lt 2 ]]; then
@@ -61,7 +60,7 @@ if [[ $? -ne 0 ]]; then
     - name: add public key to user {{ username }}
       authorized_key:
         user: "{{ username }}"
-        key: "{{ lookup('file', '/home/' + username + '/.ssh/id_rsa.pub') }}"
+        key: "{{ lookup('file', '/home/' + username + '/.ssh/id_ed25519.pub') }}"
 
     - name: change sshd port to $PORT
       lineinfile:
@@ -179,6 +178,18 @@ cat > $PBOOK <<EOF
       name: [nginx, letsencrypt, unzip]
     tags: [http]
 
+  - name: open port 80
+    ufw:
+      rule: allow
+      port: '80'
+    tags: [http]
+
+  - name: open port 443
+    ufw:
+      rule: allow
+      port: '443'
+    tags: [http]
+
   - name: remove default nginx site
     file:
       name: /etc/nginx/sites-enabled/default
@@ -236,7 +247,6 @@ cat > $PBOOK <<EOF
         server {
           listen 443 ssl default deferred;
           server_name {{ domain }};
-          ssl on;
           ssl_certificate         {{ letsencryptdir }}/live/{{ domain }}/fullchain.pem;
           ssl_certificate_key     {{ letsencryptdir }}/live/{{ domain }}/privkey.pem;
           ssl_trusted_certificate {{ letsencryptdir }}/live/{{ domain }}/fullchain.pem;
@@ -253,10 +263,23 @@ cat > $PBOOK <<EOF
           location / {
             try_files \$uri \$uri/ =404;
           }
-          location ~ \.php\$ {
-            include snippets/fastcgi-php.conf;
-            fastcgi_pass unix:/run/php/php7.4-fpm.sock;
+          location ~ \.php$ {
+            fastcgi_pass unix:/run/php/php8.1-fpm.sock;
             fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+            include fastcgi_params;
+            include snippets/fastcgi-php.conf;
+          }
+          # A long browser cache lifetime can speed up repeat visits to your page
+          location ~* \.(jpg|jpeg|gif|png|webp|svg|woff|woff2|ttf|css|js|ico|xml)\$ {
+             access_log        off;
+             log_not_found     off;
+              expires           360d;
+          }
+          # disable access to hidden files
+          location ~ /\.ht {
+              access_log off;
+              log_not_found off;
+              deny all;
           }
         }
     register: nginx_updated
@@ -276,18 +299,6 @@ cat > $PBOOK <<EOF
       name: nginx
       state: restarted
     when: nginx_updated.changed
-    tags: [http]
-
-  - name: open port 80
-    ufw:
-      rule: allow
-      port: '80'
-    tags: [http]
-
-  - name: open port 443
-    ufw:
-      rule: allow
-      port: '443'
     tags: [http]
 
   - name: Add letsencrypt cronjob for cert renewal
@@ -322,9 +333,24 @@ cat > $PBOOK <<EOF
       priv: '*.*:ALL'
     tags: [wordpress]
 
-  - name: install wordpress
+  - name: install wordpress dependencies
     apt:
-      name: [wordpress, php-mysql, php-cli, php-curl, php-gd, php-intl, php-fpm]
+      name: [php8.1,php8.1-fpm,php8.1-mysql,php-common,php8.1-cli,php8.1-common,php8.1-opcache,php8.1-readline,php8.1-mbstring,php8.1-xml,php8.1-gd,php8.1-curl]
+    tags: [wordpress]
+
+  - name: enable php8.1-fpm service
+    service:
+      name: php8.1-fpm
+      state: started
+      enabled: yes
+    tags: [wordpress]
+
+  - name: unpackage
+    unarchive:
+      src: https://wordpress.org/wordpress-6.2.2.zip
+      dest: /usr/share/
+      creates: /usr/share/wordpress
+      remote_src: yes
     tags: [wordpress]
 
   - name: set permissions on /usr/share/wordpress
@@ -332,11 +358,30 @@ cat > $PBOOK <<EOF
       path: /usr/share/wordpress
       owner: www-data
       group: www-data
+      recurse: yes
+    tags: [wordpress]
+
+  - name: check salts
+    stat:
+      path: /etc/.salts
+    register: stat_salts
+    tags: [wordpress]
+
+  - name: create salts
+    uri:
+      url: https://api.wordpress.org/secret-key/1.1/salt
+      dest: /etc/.salts
+    when: not stat_salts.stat.exists
+    tags: [wordpress]
+
+  - name: get contents of file
+    command: cat /etc/.salts
+    register: salts
     tags: [wordpress]
 
   - name: configure wordpress
     copy:
-      dest: /etc/wordpress/config-{{ domain }}.php
+      dest: /usr/share/wordpress/wp-config.php
       content: |
         <?php
         define('DB_NAME', 'wordpress');
@@ -345,7 +390,12 @@ cat > $PBOOK <<EOF
         define('DB_HOST', 'localhost');
         define('DB_COLLATE', 'utf8_general_ci');
         define('WP_CONTENT_DIR', '/usr/share/wordpress/wp-content');
-        ?>
+        {{ salts.stdout }}
+        \$table_prefix = 'brk_';
+        if ( ! defined( 'ABSPATH' ) ) {
+        	define( 'ABSPATH', __DIR__ . '/' );
+        }
+        require_once ABSPATH . 'wp-settings.php';
     tags: [wordpress]
 
   - name: update ngninx config
