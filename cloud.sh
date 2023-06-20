@@ -16,9 +16,8 @@ function info {
 }
 
 # Prerequisites
-[[ -f $HOME/.ssh/id_rsa.pub ]] || die "No SSH keys found. Run: ssh-keygen -t rsa -b 4096 -C your_email@example.com"
-[[ -x /usr/bin/ansible-playbook ]] || die "ansible is not installed. Run: sudo apt install ansible"
-[[ -x /usr/bin/sshpass ]] || die "sshpass is not installed. Run: sudo apt install sshpass"
+[[ -f $HOME/.ssh/id_ed25519.pub ]] || die "No SSH keys found. Run: ssh-keygen -t ed25519 -C your_email@example.com"
+ansible-playbook --version >/dev/null || die "ansible is not installed. Run: sudo apt install ansible"
 
 # Command line
 if [[ $# -lt 2 ]]; then
@@ -61,7 +60,7 @@ if [[ $? -ne 0 ]]; then
     - name: add public key to user {{ username }}
       authorized_key:
         user: "{{ username }}"
-        key: "{{ lookup('file', '/home/' + username + '/.ssh/id_rsa.pub') }}"
+        key: "{{ lookup('file', '/home/' + username + '/.ssh/id_ed25519.pub') }}"
 
     - name: change sshd port to $PORT
       lineinfile:
@@ -179,6 +178,18 @@ cat > $PBOOK <<EOF
       name: [nginx, letsencrypt, unzip]
     tags: [http]
 
+  - name: open port 80
+    ufw:
+      rule: allow
+      port: '80'
+    tags: [http]
+
+  - name: open port 443
+    ufw:
+      rule: allow
+      port: '443'
+    tags: [http]
+
   - name: remove default nginx site
     file:
       name: /etc/nginx/sites-enabled/default
@@ -278,18 +289,6 @@ cat > $PBOOK <<EOF
     when: nginx_updated.changed
     tags: [http]
 
-  - name: open port 80
-    ufw:
-      rule: allow
-      port: '80'
-    tags: [http]
-
-  - name: open port 443
-    ufw:
-      rule: allow
-      port: '443'
-    tags: [http]
-
   - name: Add letsencrypt cronjob for cert renewal
     cron:
       name: letsencrypt_renewal
@@ -322,9 +321,17 @@ cat > $PBOOK <<EOF
       priv: '*.*:ALL'
     tags: [wordpress]
 
-  - name: install wordpress
+  - name: install wordpress dependencies
     apt:
-      name: [wordpress, php-mysql, php-cli, php-curl, php-gd, php-intl, php-fpm]
+      name: [php-mysql, php-cli, php-curl, php-gd, php-intl, php-fpm]
+    tags: [wordpress]
+
+  - name: unpackage
+    unarchive:
+      src: https://wordpress.org/wordpress-6.2.2.zip
+      dest: /usr/share/
+      creates: /usr/share/wordpress
+      remote_src: yes
     tags: [wordpress]
 
   - name: set permissions on /usr/share/wordpress
@@ -332,6 +339,7 @@ cat > $PBOOK <<EOF
       path: /usr/share/wordpress
       owner: www-data
       group: www-data
+      recurse: yes
     tags: [wordpress]
 
   - name: configure wordpress
