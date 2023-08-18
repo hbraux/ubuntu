@@ -115,7 +115,7 @@ cat > $PBOOK <<EOF
 
   - name: remove useless services
     apt:
-      name: snapd,policykit-1,qemu-guest-agent,ntp,unattended-upgrades
+      name: snapd,policykit-1,qemu-guest-agent,ntp,unattended-upgrades,apache2
       state: absent
       purge: yes
     tags: [default]
