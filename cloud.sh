@@ -35,7 +35,7 @@ ping -c1 $VM >/dev/null || die "Cannot reach $VM"
 ssh -n -p $PORT -o StrictHostKeyChecking=no $VM echo
 if [[ $? -ne 0 ]]; then
   ssh-keygen -f $HOME/.ssh/known_hosts -R $VM
-  info "Securing $VM"
+  info "Securing server $VM"
   echo -e "Cloud admin ($ADMIN) password: \c"
   read pass
   cat >$PBOOK <<EOF
@@ -86,7 +86,7 @@ if [[ $? -ne 0 ]]; then
       
 EOF
   ansible-playbook -i $VM, -b -e username=$USER --ssh-extra-args="-o PubkeyAuthentication=no -o StrictHostKeyChecking=no" $PBOOK || die
-  info "Secured completed. Re-run the script in a few seconds"
+  info "Secured completed. Wait at least one minute and re-run the same command"
   exit
 fi
 
@@ -266,7 +266,7 @@ cat > $PBOOK <<EOF
           }
           location ~ \.php\$ {
             include snippets/fastcgi-php.conf;
-            fastcgi_pass unix:/run/php/php7.4-fpm.sock;
+            fastcgi_pass unix:/run/php/php-fpm.sock;
             fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
           }
         }
@@ -292,8 +292,8 @@ cat > $PBOOK <<EOF
   - name: Add letsencrypt cronjob for cert renewal
     cron:
       name: letsencrypt_renewal
-      special_time: monthly
-      job: "/usr/bin/letsencrypt --renew certonly -n --webroot -w {{ letsencryptdir }} -m contact@{{ domain }} --agree-tos -d {{ domain }}"
+      special_time: weekly
+      job: "/usr/bin/letsencrypt --keep-until-expiring certonly -n --webroot -w {{ letsencryptdir }} -m contact@{{ domain }} --agree-tos -d {{ domain }}"
     tags: [http]
 
   - name: install mysql
