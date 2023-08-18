@@ -100,7 +100,9 @@ cat > $PBOOK <<EOF
   - name: remove Cloud admin user $ADMIN
     user:
       name: $ADMIN
-      remove: yes
+      state: absent
+      force: true
+      remove: true
     tags: [default]
 
   - name: run apt update and upgrade
