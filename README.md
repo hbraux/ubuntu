@@ -8,20 +8,25 @@ curl -s https://raw.githubusercontent.com/hbraux/ubuntu/main/install.sh | bash -
 ```
 
 Supported features:
-* default (env git docker sbt maven docker )
+* default (env git docker sbt maven)
 * intellij
 * python3
 * netdata
-* oracle
 * all
 
 Limitations: 
-* Only tested with Ubuntu 18.04 and 20.04
+* Only tested with Ubuntu 20.04 and 22.04
 
 ### Cloud VM
 
-Run the following command to secure a Cloud VM running Ubuntu:
+Run the following command *from your computer* to secure a Cloud VM running Ubuntu:
 ```sh
 curl -s https://raw.githubusercontent.com/hbraux/ubuntu/main/cloud.sh | bash -s SERVER FEATURE ...
 ```
 SERVER must be a FQDN
+
+Supported features:
+* default 
+* minecraft
+* http
+* wordpress

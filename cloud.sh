@@ -16,7 +16,7 @@ function info {
 }
 
 # Prerequisites
-[[ -f $HOME/.ssh/id_rsa.pub ]] || die "No SSH keys found. Run: ssh-keygen -t rsa -b 4096 -C your_email@example.com"
+[[ -f $HOME/.ssh/id_ed25519.pub ]] || die "No SSH keys found. Run: ssh-keygen -t ed25519 -C your_email@example.com"
 [[ -x /usr/bin/ansible-playbook ]] || die "ansible is not installed. Run: sudo apt install ansible"
 [[ -x /usr/bin/sshpass ]] || die "sshpass is not installed. Run: sudo apt install sshpass"
 
@@ -61,7 +61,7 @@ if [[ $? -ne 0 ]]; then
     - name: add public key to user {{ username }}
       authorized_key:
         user: "{{ username }}"
-        key: "{{ lookup('file', '/home/' + username + '/.ssh/id_rsa.pub') }}"
+        key: "{{ lookup('file', '/home/' + username + '/.ssh/id_ed25519.pub') }}"
 
     - name: change sshd port to $PORT
       lineinfile:
@@ -210,6 +210,18 @@ cat > $PBOOK <<EOF
     register: nginx_updated
     tags: [http]
 
+  - name: open port 80
+    ufw:
+      rule: allow
+      port: '80'
+    tags: [http]
+
+  - name: open port 443
+    ufw:
+      rule: allow
+      port: '443'
+    tags: [http]
+
   - name: reload nginx
     service:
       name: nginx
@@ -236,7 +248,6 @@ cat > $PBOOK <<EOF
         server {
           listen 443 ssl default deferred;
           server_name {{ domain }};
-          ssl on;
           ssl_certificate         {{ letsencryptdir }}/live/{{ domain }}/fullchain.pem;
           ssl_certificate_key     {{ letsencryptdir }}/live/{{ domain }}/privkey.pem;
           ssl_trusted_certificate {{ letsencryptdir }}/live/{{ domain }}/fullchain.pem;
@@ -276,18 +287,6 @@ cat > $PBOOK <<EOF
       name: nginx
       state: restarted
     when: nginx_updated.changed
-    tags: [http]
-
-  - name: open port 80
-    ufw:
-      rule: allow
-      port: '80'
-    tags: [http]
-
-  - name: open port 443
-    ufw:
-      rule: allow
-      port: '443'
     tags: [http]
 
   - name: Add letsencrypt cronjob for cert renewal
@@ -332,6 +331,7 @@ cat > $PBOOK <<EOF
       path: /usr/share/wordpress
       owner: www-data
       group: www-data
+      recurse: yes
     tags: [wordpress]
 
   - name: configure wordpress
