@@ -265,6 +265,7 @@ cat > $PBOOK <<EOF
           index index.php index.html index.htm;
           location / {
             try_files \$uri \$uri/ =404;
+            client_max_body_size 100M;
           }
           location ~ \.php\$ {
             include snippets/fastcgi-php.conf;
