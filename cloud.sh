@@ -95,7 +95,7 @@ cat > $PBOOK <<EOF
 - hosts: $VM
   vars:
     ansible_port: $PORT
-    letsencryptdir: "/var/www/letsencrypt"
+    letsencryptdir: "/etc/letsencrypt"
   tasks:
   - name: remove Cloud admin user $ADMIN
     user:
