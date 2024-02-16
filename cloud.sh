@@ -202,7 +202,7 @@ cat > $PBOOK <<EOF
           listen 80 default_server;
           server_name {{ domain }};
           location /.well-known/acme-challenge {
-            root {{ letsencryptdir }};
+          root /var/www/letsencrypt;
             try_files \$uri \$uri/ =404;
           }
           location / {
