@@ -264,7 +264,7 @@ cat > $PBOOK <<EOF
           root /var/www/html;
           index index.php index.html index.htm;
           location / {
-            try_files \$uri \$uri/ =404;
+            try_files $uri $uri/ /index.php$is_args$args;
             client_max_body_size 100M;
           }
           location ~ \.php\$ {
