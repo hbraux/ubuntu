@@ -176,9 +176,9 @@ cat > $PBOOK <<EOF
       port: '22'
     tags: [endlessh]
 
-  - name: install nginx and letsencrypt
+  - name: install nginx and cerbot
     apt:
-      name: [nginx, letsencrypt, unzip]
+      name: [nginx, unzip, certbot python3-certbot-nginx]
     tags: [http]
 
   - name: remove default nginx site
@@ -202,7 +202,6 @@ cat > $PBOOK <<EOF
           listen 80 default_server;
           server_name {{ domain }};
           location /.well-known/acme-challenge {
-          root /var/www/letsencrypt;
             try_files \$uri \$uri/ =404;
           }
           location / {
@@ -231,8 +230,8 @@ cat > $PBOOK <<EOF
     when: nginx_updated.changed
     tags: [http]
 
-  - name: Create letsencrypt certificate
-    shell: letsencrypt certonly -n --webroot --webroot-path {{ letsencryptdir }} --config-dir {{ letsencryptdir }} --work-dir {{ letsencryptdir }} --logs-dir {{ letsencryptdir }}  -m contact@{{ domain }} --agree-tos -d {{ domain }}
+  - name: Create certificate
+    shell: certbot --nginx -d {{ domain }}
     args:
       creates: "{{ letsencryptdir }}/live/{{ domain }}"
     tags: [http]
@@ -292,11 +291,11 @@ cat > $PBOOK <<EOF
     when: nginx_updated.changed
     tags: [http]
 
-  - name: Add letsencrypt cronjob for cert renewal
+  - name: Add certbot to cron
     cron:
-      name: letsencrypt_renewal
+      name: certificate_renewal
       special_time: weekly
-      job: "/usr/bin/letsencrypt --keep-until-expiring certonly -n --webroot -w {{ letsencryptdir }} -m contact@{{ domain }} --agree-tos -d {{ domain }}"
+      job: "/usr/bin/certbot renew --renew-hook 'service nginx restart'"
     tags: [http]
 
   - name: install mysql
